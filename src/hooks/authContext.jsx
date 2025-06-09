@@ -8,14 +8,16 @@ export const useAuth = () => useContext(AuthContext)
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const fetchUser = async () => {
     try {
       const res = await axios.get(`${BASE_URL}/me`, { withCredentials: true })
       setUser(res.data)
-    //   console.log(user)
+      setIsAdmin(res.data.role === 'admin')
     } catch (err) {
       setUser(null)
+      setIsAdmin(false)
     } finally {
       setLoading(false)
     }
@@ -26,20 +28,19 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const login = async (credentials) => {
-    await axios.post(`${BASE_URL}/login`, credentials, { withCredentials: true })
+    const response = await axios.post(`${BASE_URL}/login`, credentials, { withCredentials: true })
     await fetchUser()
+    return response.data
   }
 
   const logout = async () => {
     await axios.post(`${BASE_URL}/logout`, {}, { withCredentials: true })
     setUser(null)
+    setIsAdmin(false)
   }
 
-
-
-
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )

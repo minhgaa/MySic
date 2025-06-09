@@ -1,66 +1,116 @@
 import { CiMicrophoneOn, CiSaveDown1 } from "react-icons/ci";
 import { RiPlayListAddLine } from "react-icons/ri";
 import { FaMusic } from "react-icons/fa";
-
-const songs = [
-    {
-        id: 1,
-        title: "Dance Alone",
-        artist: "Kylie Minogue",
-        year: "2024",
-        duration: "04:30",
-        image: "/src/assets/vpop.jpg",
-        isPlaying: false,
-    },
-    {
-        id: 2,
-        title: "Flowers",
-        artist: "Miley Cyrus",
-        year: "2023",
-        duration: "03:15",
-        image: "/src/assets/kpop.jpg",
-        isPlaying: true,
-    },
-    {
-        id: 3,
-        title: "Paint The Town Red",
-        artist: "Doja Cat",
-        year: "2023",
-        duration: "05:30",
-        image: "/src/assets/usuk.jpg",
-        isPlaying: false,
-    },
-    {
-        id: 4,
-        title: "Who I Am",
-        artist: "Unknown Artist",
-        year: "2024",
-        duration: "04:10",
-        image: "/src/assets/caroutside.jpeg",
-        isPlaying: false,
-    },
-];
+import { IoPlayOutline, IoPauseOutline } from "react-icons/io5";
+import { useMusic } from '../contexts/MusicContext';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 export default function MusicPlayerPage() {
+    const { currentSong, isPlaying, playSong, audioRef } = useMusic();
+    const [songs, setSongs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [genres, setGenres] = useState({});
+    const [progress, setProgress] = useState(0);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+
+        const handleTimeUpdate = () => {
+            setProgress(audio.currentTime);
+        };
+
+        audio.addEventListener('timeupdate', handleTimeUpdate);
+
+        return () => {
+            audio.removeEventListener('timeupdate', handleTimeUpdate);
+        };
+    }, [audioRef]);
+
+    const formatTime = (time) => {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+    };
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [songsResponse, genresResponse] = await Promise.all([
+                    axios.get('http://localhost:3000/api/songs', {
+                        withCredentials: true
+                    }),
+                    axios.get('http://localhost:3000/api/genres', {
+                        withCredentials: true
+                    })
+                ]);
+
+                console.log('Fetched songs:', songsResponse.data);
+                setSongs(songsResponse.data);
+
+                // Create a map of genre IDs to genre names
+                const genreMap = {};
+                genresResponse.data.forEach(genre => {
+                    genreMap[genre.id] = genre.name;
+                });
+                setGenres(genreMap);
+            } catch (err) {
+                console.error('Error fetching data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Debug current state
+    useEffect(() => {
+        console.log('Current State:', {
+            currentSong: currentSong ? {
+                id: currentSong._id,
+                title: currentSong.title
+            } : null,
+            isPlaying,
+            totalSongs: songs.length
+        });
+    }, [currentSong, isPlaying, songs]);
+
+    // Function to get genre name from genre ID
+    const getGenreName = (genreId) => {
+        return genres[genreId] || "Unknown Genre";
+    };
+
+    const handlePlayClick = (song) => {
+        console.log('Attempting to play song:', song);
+        playSong(song);
+    };
+
+    if (loading) {
+        return <div className="w-full h-full bg-slate-950 rounded-lg flex items-center justify-center">
+            <div className="text-white">Loading...</div>
+        </div>;
+    }
+
     return (
         <div className="w-full h-full bg-slate-950 rounded-lg">
             <div className="relative w-full h-[400px]">
                 <img
-                    src="src/assets/jamearthur.jpg"
+                    src={currentSong?.songImage || "/src/assets/default-cover.jpg"}
                     className="absolute w-full h-full object-cover rounded-t-lg"
                     alt="Album"
                 />
                 <div className="relative z-10 flex flex-col py-5 px-5 bg-black/40 h-full justify-end items-start rounded-lg">
                     <div className="text-xl font-bold text-white text-center">
-                        Car's Outside
+                        {currentSong?.title || "No song selected"}
                     </div>
                     <span className="font-medium text-sm text-gray-300 text-center mt-1">
-                        James Arthur
+                        {currentSong?.artist || "---"}
                     </span>
                     <div className="flex justify-center gap-5 mt-4 text-white">
-                        <CiMicrophoneOn size={20} />
-                        <RiPlayListAddLine size={20} />
-                        <CiSaveDown1 size={20} />
+                        <CiMicrophoneOn size={20} className="cursor-pointer hover:text-orange-500 transition-colors" />
+                        <RiPlayListAddLine size={20} className="cursor-pointer hover:text-orange-500 transition-colors" />
+                        <CiSaveDown1 size={20} className="cursor-pointer hover:text-orange-500 transition-colors" />
                     </div>
                 </div>
             </div>
@@ -70,68 +120,107 @@ export default function MusicPlayerPage() {
                         <span className="text-white text-sm font-semibold mb-1">
                             Next songs
                         </span>
-                        <div className="w-full p-2 space-y-3 overflow-y-auto max-h-[300px] custom-scrollbar">
-                            {songs.map((song) => (
-                                <div key={song.id} className="relative group transition duration-300">
-                                    {song.isPlaying && (
-                                        <div className="absolute -left-5 top-1/2 transform -translate-y-1/2">
-                                            <FaMusic className="text-orange-500 animate-pulse" size={12} />
-                                        </div>
-                                    )}
-
+                        <div className="w-full p-2 space-y-3 overflow-y-auto max-h-[300px] scrollbar-hide">
+                            <style>
+                                {`
+                                    .scrollbar-hide::-webkit-scrollbar {
+                                        display: none;
+                                    }
+                                    .scrollbar-hide {
+                                        -ms-overflow-style: none;
+                                        scrollbar-width: none;
+                                    }
+                                `}
+                            </style>
+                            {songs.map((song) => {
+                                const isCurrentSong = currentSong?.id === song.id;
+                                const isCurrentlyPlaying = isCurrentSong && isPlaying;
+                                
+                                return (
+                                    <div 
+                                        key={song.id} 
+                                        className="relative group transition duration-300 cursor-pointer"
+                                        onClick={() => handlePlayClick(song)}
+                                    >
                                     <div
                                         className={`p-2 rounded-xl transition-all duration-300 shadow-md border 
-                                ${song.isPlaying
+                                            ${isCurrentlyPlaying
                                                 ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white border-transparent"
-                                                : "bg-[#1C1C24] text-gray-300 border-transparent group-hover:border-orange-500 group-hover:bg-[#2A2A35] group-hover:shadow-lg"
+                                                : "bg-[#1C1C24] text-gray-300 border-transparent hover:border-orange-500/20 hover:bg-[#2A2A35] hover:shadow-lg"
                                             }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center space-x-3">
+                                                    <div className="relative group/image w-8 h-8">
                                                 <img
-                                                    src={song.image}
+                                                            src={song.songImage}
                                                     alt={song.title}
                                                     className="w-8 h-8 rounded-full object-cover shadow-sm"
                                                 />
-                                                <div className="flex flex-col">
-                                                    <span className="font-semibold text-[10px] truncate">{song.title}</span>
-                                                    <span className="text-[8px] text-gray-400 group-hover:text-gray-200">
-                                                        {song.artist}
+                                                        <div className={`absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-opacity
+                                                            ${isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover/image:opacity-100'}`}>
+                                                            {isCurrentlyPlaying ? (
+                                                                <IoPauseOutline className="text-white" size={16} />
+                                                            ) : (
+                                                                <IoPlayOutline className="text-white" size={16} />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col max-w-[120px]">
+                                                        <span className={`font-semibold text-[10px] truncate ${
+                                                            isCurrentSong ? 'text-white' : 'text-gray-300'
+                                                        }`}>
+                                                            {song.title}
+                                                        </span>
+                                                        <span className={`text-[8px] truncate ${
+                                                            isCurrentSong 
+                                                            ? 'text-white/80' 
+                                                            : 'text-gray-400 group-hover:text-gray-300'
+                                                        }`}>
+                                                            {song.artist} • {getGenreName(song.genreId)}
                                                     </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="text-[11px] text-gray-400 group-hover:text-gray-200">
-                                                {song.duration}
+                                                <div className={`text-[11px] ${
+                                                    isCurrentSong 
+                                                    ? 'text-white/80' 
+                                                    : 'text-gray-400 group-hover:text-gray-300'
+                                                }`}>
+                                                    {isCurrentSong ? formatTime(progress) : "00:00"}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
             </div>
-            <div className=" h-[300px] bg-[#191B20] rounded-2xl  w-full">
-                <div className="relative h-[180px] ">
+            <div className="h-[300px] bg-[#191B20] rounded-2xl w-full">
+                <div className="relative h-[180px]">
                     <img
                         className="w-full h-full rounded-t-2xl absolute object-cover object-top opacity-70"
-                        src="src/assets/jame.jpg"
+                        src={currentSong?.songImage || "/src/assets/default-cover.jpg"}
                         alt="Artist"
                     />
                     <span className="relative text-white text-sm font-semibold p-5 block drop-shadow-lg">
                         About the Artist
                     </span>
-
                 </div>
                 <div className="h-[120px] p-5 flex flex-col justify-center text-white">
                     <div className="flex justify-between">
-                        <h3 className="text-base font-bold">James Arthur</h3>
-                        <button className="bg-orange-600 rounded-full text-[10px] p-1 px-2 text-white">Follow</button>
+                        <h3 className="text-base font-bold">{currentSong?.artist || "No Artist Selected"}</h3>
+                        <button className="bg-orange-600 rounded-full text-[10px] p-1 px-2 text-white hover:bg-orange-700 transition-colors">
+                            Follow
+                        </button>
                     </div>
                     <p className="text-[10px] text-gray-300 mt-2">
-                        James Smith is a renowned artist known for his soulful music and inspiring lyrics.
+                        {currentSong?.artist ? `${currentSong.artist} is a talented artist known for their unique style and captivating performances.` : "Select a song to learn more about the artist."}
                     </p>
-                    <p className="text-xs text-gray-400 mt-2">Genres: Pop, Soul, R&B</p>
+                    <p className="text-xs text-gray-400 mt-2">
+                        Genre: {currentSong ? getGenreName(currentSong.genreId) : "---"}
+                    </p>
                 </div>
             </div>
         </div>

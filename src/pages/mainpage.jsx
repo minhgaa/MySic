@@ -6,8 +6,6 @@ import PopularArtists from '../components/PopularArtist';
 import MusicPlayerPage from './musicplayer';
 import SearchView from './search';
 
-import Header from '../components/header';
-
 const Mainpage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

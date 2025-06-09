@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cloudinary/react": "^1.14.3",
+    "@cloudinary/url-gen": "^1.21.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.10",
@@ -19,10 +21,12 @@
     "js-cookie": "^3.0.5",
     "jwt-decode": "^4.0.0",
     "react": "^18.2.0",
+    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
     "react-icons": "^5.0.1",
     "react-router-dom": "^6.22.1",
-    "react-swipeable": "^7.0.2"
+    "react-swipeable": "^7.0.2",
+    "recharts": "^2.15.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
