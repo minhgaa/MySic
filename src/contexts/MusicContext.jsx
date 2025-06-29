@@ -11,16 +11,17 @@ export const MusicProvider = ({ children }) => {
     const [currentSong, setCurrentSong] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [likedSongs, setLikedSongs] = useState(new Set());
+    const [currentPlaylist, setCurrentPlaylist] = useState(null);
+    const [playlist, setPlaylist] = useState([]);
     const audioRef = useRef(new Audio());
 
-    // Fetch liked songs when component mounts
     useEffect(() => {
         const fetchLikedSongs = async () => {
             try {
-                const response = await axios.get('http://localhost:3000/api/songs/liked', {
+                const response = await axios.get('http://localhost:8080/api/users/liked', {
                     withCredentials: true
                 });
-                const likedSongIds = new Set(response.data.map(song => song.songId));
+                const likedSongIds = new Set(response.data.map(song => song._id));
                 setLikedSongs(likedSongIds);
             } catch (error) {
                 console.error('Error fetching liked songs:', error);
@@ -30,8 +31,8 @@ export const MusicProvider = ({ children }) => {
         fetchLikedSongs();
     }, []);
 
-    const playSong = (song) => {
-        console.log('Playing song:', song);
+    const playSong = (song, playlistData = null) => {
+        console.log('Playing song:', song, 'from playlist:', playlistData);
         
         if (currentSong?.id === song.id) {
             // Same song, just play/pause
@@ -52,6 +53,16 @@ export const MusicProvider = ({ children }) => {
         // Update currentSong immediately with all properties
         setCurrentSong({...song}); // Spread operator to create a new object with all properties
         
+        // Update playlist context if playing from playlist
+        if (playlistData) {
+            setCurrentPlaylist(playlistData.playlist);
+            setPlaylist(playlistData.songs);
+        } else {
+            // Clear playlist context if playing individual song
+            setCurrentPlaylist(null);
+            setPlaylist([]);
+        }
+        
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
             playPromise
@@ -64,6 +75,8 @@ export const MusicProvider = ({ children }) => {
                     // Reset states if playback fails
                     setCurrentSong(null);
                     setIsPlaying(false);
+                    setCurrentPlaylist(null);
+                    setPlaylist([]);
                 });
         }
     };
@@ -74,9 +87,14 @@ export const MusicProvider = ({ children }) => {
         setIsPlaying(false);
     };
 
+    const clearPlaylist = () => {
+        setCurrentPlaylist(null);
+        setPlaylist([]);
+    };
+
     const toggleLike = async (songId) => {
         try {
-            const response = await axios.post(`http://localhost:3000/api/songs/${songId}/like`, {}, {
+            const response = await axios.post(`http://localhost:8080/api/songs/${songId}/like`, {}, {
                 withCredentials: true
             });
             
@@ -111,7 +129,12 @@ export const MusicProvider = ({ children }) => {
             audioRef,
             toggleLike,
             isLiked,
-            likedSongs
+            likedSongs,
+            currentPlaylist,
+            playlist,
+            clearPlaylist,
+            setCurrentPlaylist,
+            setPlaylist
         }}>
             {children}
         </MusicContext.Provider>

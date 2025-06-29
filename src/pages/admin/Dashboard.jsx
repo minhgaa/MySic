@@ -33,9 +33,9 @@ export default function Dashboard() {
   const fetchStats = async () => {
     try {
       const [songs, users, genres] = await Promise.all([
-        axios.get('http://localhost:3000/api/songs', { withCredentials: true }),
-        axios.get('http://localhost:3000/api/users', { withCredentials: true }),
-        axios.get('http://localhost:3000/api/genres', { withCredentials: true })
+        axios.get('http://localhost:8080/api/songs', { withCredentials: true }),
+        axios.get('http://localhost:8080/api/users', { withCredentials: true }),
+        axios.get('http://localhost:8080/api/genres', { withCredentials: true })
       ]);
 
       const allSongs = songs.data;

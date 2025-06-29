@@ -1,22 +1,10 @@
 import React, { useRef } from "react";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
+import { useMusic } from "../contexts/MusicContext";
 
-const songs = [
-    { title: "Golden Days", artist: "Felix Carter", image: "src/assets/usuk.jpg", bg: "bg-orange-500" },
-    { title: "Fading Horizon", artist: "Ella Hunt", image: "src/assets/vpop.jpg", bg: "bg-emerald-700" },
-    { title: "Waves of Time", artist: "Lana Rivers", image: "src/assets/kpop.jpg", bg: "bg-blue-900" },
-    { title: "Electric Dreams", artist: "Mia Lowell", image: "src/assets/vpop.jpg", bg: "bg-amber-600" },
-    { title: "Shadows & Light", artist: "Ryan Miles", image: "src/assets/usuk.jpg", bg: "bg-cyan-800" },
-    { title: "Echoes of Midnight", artist: "Jon Hickman", image: "src/assets/kpop.jpg", bg: "bg-red-800" },
-    { title: "Golden Days", artist: "Felix Carter", image: "src/assets/usuk.jpg", bg: "bg-orange-500" },
-    { title: "Fading Horizon", artist: "Ella Hunt", image: "src/assets/vpop.jpg", bg: "bg-emerald-700" },
-    { title: "Waves of Time", artist: "Lana Rivers", image: "src/assets/kpop.jpg", bg: "bg-blue-900" },
-    { title: "Electric Dreams", artist: "Mia Lowell", image: "src/assets/vpop.jpg", bg: "bg-amber-600" },
-    { title: "Shadows & Light", artist: "Ryan Miles", image: "src/assets/usuk.jpg", bg: "bg-cyan-800" },
-];
-
-const PopularSongs = () => {
+const PopularSongs = ({ songs = [] }) => {
     const scrollRef = useRef(null);
+    const { playSong, currentSong, isPlaying } = useMusic();
 
     const scroll = (direction) => {
         if (scrollRef.current) {
@@ -45,22 +33,31 @@ const PopularSongs = () => {
                 ref={scrollRef}
                 className="h-[160px] flex gap-6 overflow-x-auto hide-scrollbar scroll-smooth"
             >
-                {songs.map((song, i) => (
+                {songs.map((song, i) => {
+                    const isCurrentSong = currentSong?.id === song.id;
+                    const isCurrentlyPlaying = isCurrentSong && isPlaying;
+
+                    return (
                     <div
-                        key={i}
-                        className={`rounded-2xl w-[130px] h-full flex-shrink-0 shadow-lg ${song.bg} relative flex flex-col items-center overflow-hidden`}
+                            key={song.id}
+                            onClick={() => playSong(song)}
+                            className={`rounded-2xl w-[130px] h-full flex-shrink-0 shadow-lg relative flex flex-col items-center overflow-hidden cursor-pointer transition-all duration-300
+                                ${isCurrentlyPlaying 
+                                    ? 'bg-gradient-to-r from-orange-500 to-orange-600' 
+                                    : 'bg-zinc-800 hover:bg-zinc-700'}`}
                     >
                         <img
-                            src={song.image}
+                                src={song.songImage || "/default-song.png"}
                             alt={song.title}
                             className="h-[70%] w-[95%] object-cover rounded-xl mt-1"
                         />
                         <div className="p-1 text-white flex flex-col items-center justify-center h-[30%] text-center">
-                            <h3 className="text-[11px] font-semibold">{song.title}</h3>
-                            <p className="text-[9px] text-gray-200">{song.artist}</p>
+                                <h3 className="text-[11px] font-semibold truncate w-full">{song.title}</h3>
+                                <p className="text-[9px] text-gray-200 truncate w-full">{song.artist}</p>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

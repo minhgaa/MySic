@@ -7,6 +7,7 @@ import { FiUser } from "react-icons/fi";
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/authContext';
+import OTPVerification from '../components/OTPVerification';
 
 const pageVariants = {
   initial: { 
@@ -66,6 +67,8 @@ export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
+  const [registrationData, setRegistrationData] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -73,7 +76,6 @@ export default function Login() {
     confirmPassword: ''
   });
 
-  // Redirect if already logged in
   useEffect(() => {
     if (user) {
       navigate('/', { replace: true });
@@ -82,7 +84,7 @@ export default function Login() {
 
   const handleGoogleLogin = () => {
     console.log('Starting Google login redirect...');
-    window.location.href = 'http://localhost:3000/api/auth/google';
+    window.location.href = 'http://localhost:8080/api/auth/google';
   };
 
   const handleSubmit = async (e) => {
@@ -98,33 +100,108 @@ export default function Login() {
           return;
         }
 
-        const registerData = {
+        // Log the data being sent
+        console.log('Sending registration data:', {
           name: formData.name,
           email: formData.email,
           password: formData.password,
           confirmPassword: formData.confirmPassword
-        };
+        });
 
-        console.log('Sending register request with data:', registerData);
-        await axios.post('http://localhost:3000/api/auth/register', registerData);
-        // After registration, automatically log in
-        await login({ email: formData.email, password: formData.password });
-        navigate('/');
+        // Register user - this will create user and send OTP
+        const response = await axios.post('http://localhost:8080/api/auth/register', {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          confirmPassword: formData.confirmPassword
+        });
+
+        console.log('Registration response:', response.data);
+
+        navigate(`/confirm-otp/${encodeURIComponent(formData.email)}`, {
+          state: { 
+            registrationData: {
+              email: formData.email,
+              password: formData.password 
+            }
+          }
+        });
       } else {
         const loginData = {
           email: formData.email,
           password: formData.password
         };
-        console.log('Sending login request with data:', loginData);
         await login(loginData);
         navigate('/');
       }
     } catch (err) {
-      console.error(isRegister ? 'Registration error:' : 'Login error:', err);
-      setError(err.response?.data?.message || 'An error occurred. Please try again.');
+      console.error('Registration error:', err);
+      console.error('Error response:', err.response?.data);
+      
+      // Handle validation errors array of objects
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        // Extract error messages from objects and join them
+        const errorMessages = err.response.data.errors.map(error => {
+          // Log each error object to see its structure
+          console.log('Error object:', error);
+          // Try different possible error message formats
+          return error.msg || error.message || error.error || JSON.stringify(error);
+        });
+        setError(errorMessages.join('\n'));
+      } else if (err.response?.data?.error) {
+        // Single error message
+        setError(err.response.data.error);
+      } else {
+        // Fallback error message
+        setError(err.response?.data?.message || 'An error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerifyOTP = async (otp) => {
+    setLoading(true);
+    try {
+      await axios.post('http://localhost:8080/api/auth/confirm-otp', {
+        email: registrationData.email,
+        otp: otp
+      });
+      
+      await login({
+        email: registrationData.email,
+        password: registrationData.password
+      });
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setLoading(true);
+    try {
+      console.log("Sending resend OTP with email:", registrationData.email, typeof registrationData.email);
+  
+      await axios.post('http://localhost:8080/api/auth/resend-otp', {
+        email: registrationData.email 
+      });
+    } catch (err) {
+      console.error("Resend OTP Error:", err);
+      setError(err.response?.data?.message || 'Failed to resend OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   return (
@@ -160,7 +237,11 @@ export default function Login() {
               exit={{ opacity: 0, y: -10 }}
               className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm"
             >
-              {error}
+              {error.split('\n').map((line, index) => (
+                <div key={index} className="text-center">
+                  {line}
+                </div>
+              ))}
             </motion.div>
           )}
 
@@ -203,8 +284,9 @@ export default function Login() {
                     <input
                       type="text"
                       placeholder="Full Name"
+                      name="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={handleInputChange}
                       className="w-full bg-zinc-800/50 text-white pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                       required={isRegister}
                     />
@@ -221,8 +303,9 @@ export default function Login() {
               <input
                 type="email"
                 placeholder="Email Address"
+                name="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full bg-zinc-800/50 text-white pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                 required
               />
@@ -236,8 +319,9 @@ export default function Login() {
               <input
                 type="password"
                 placeholder="Password"
+                name="password"
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full bg-zinc-800/50 text-white pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                 required
               />
@@ -257,8 +341,9 @@ export default function Login() {
                     <input
                       type="password"
                       placeholder="Confirm Password"
+                      name="confirmPassword"
                       value={formData.confirmPassword}
-                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      onChange={handleInputChange}
                       className="w-full bg-zinc-800/50 text-white pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                       required={isRegister}
                     />
@@ -302,6 +387,18 @@ export default function Login() {
               {isRegister ? 'Sign In' : 'Create Account'}
             </motion.button>
           </motion.p>
+
+          {!showOTP ? (
+            <>
+              {/* ... existing login/register form code ... */}
+            </>
+          ) : (
+            <OTPVerification
+              onVerify={handleVerifyOTP}
+              onResend={handleResendOTP}
+              isLoading={loading}
+            />
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>

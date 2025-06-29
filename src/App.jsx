@@ -15,6 +15,7 @@ import Statistics from './pages/admin/Statistics';
 import GenreManagement from './pages/admin/GenreManagement';
 import Playlist from './pages/playlist';
 import Profile from './pages/profile';
+import OTPVerificationPage from './pages/otp-verification';
 
 function AppRoutes() {
   const { isAdmin } = useAuth();
@@ -31,8 +32,7 @@ function AppRoutes() {
           <Route path="/admin/songs" element={<SongManagement />} />
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/stats" element={<Statistics />} />
-          <Route path="/admin/genres" element={<GenreManagement />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin/genres" element={<GenreManagement />} />\
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
         </Route>
@@ -44,17 +44,17 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
+      <Route path="/confirm-otp/:email" element={<OTPVerificationPage />} />
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Mainpage />} />
         <Route path="/artist" element={<Artist />} />
         <Route path="/category" element={<Category />} />
+        <Route path="/playlist" element={<Playlist />} />
         <Route path="/playlist/:id" element={<Playlist />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
 
-      {/* Redirect any unknown routes to login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

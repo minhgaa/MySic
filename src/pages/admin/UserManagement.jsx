@@ -28,7 +28,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:3000/api/users', {
+      const response = await axios.get('http://localhost:8080/api/users', {
         withCredentials: true
       });
       setUsers(response.data);
@@ -42,7 +42,7 @@ export default function UserManagement() {
   const handleDeleteUser = async (userId) => {
     setDeleteLoading(true);
     try {
-      await axios.delete(`http://localhost:3000/api/users/${userId}`, {
+      await axios.delete(`http://localhost:8080/api/users/${userId}`, {
         withCredentials: true
       });
       setUsers(prev => prev.filter(user => user._id !== userId));

@@ -20,13 +20,10 @@ const GenreManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [newGenreName, setNewGenreName] = useState('');
-  const [editingGenre, setEditingGenre] = useState(null);
   const [error, setError] = useState('');
-
-  // Mock data for song counts
-  const getRandomSongCount = () => Math.floor(Math.random() * 50) + 1;
 
   useEffect(() => {
     fetchGenres();
@@ -35,14 +32,34 @@ const GenreManagement = () => {
   const fetchGenres = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:3000/api/genres', {
+      // Fetch both genres and songs
+      const [genresResponse, songsResponse] = await Promise.all([
+        axios.get('http://localhost:8080/api/genres', {
+          withCredentials: true,
+          params: {
+            search: searchTerm
+          }
+        }),
+        axios.get('http://localhost:8080/api/songs', {
         withCredentials: true
-      });
+        })
+      ]);
       
-      // Add random song count to each genre
-      const genresWithSongCount = response.data.map(genre => ({
+      // Count songs for each genre
+      const songCounts = songsResponse.data.reduce((acc, song) => {
+        const genreId = song.genreId;
+        if (genreId) {
+          acc[genreId] = (acc[genreId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+      
+      // Add song count to each genre
+      const genresWithSongCount = genresResponse.data
+        .filter(genre => genre && genre.id && genre.name) // Lọc ra các genre hợp lệ
+        .map(genre => ({
         ...genre,
-        songCount: getRandomSongCount()
+          songCount: songCounts[genre.id] || 0
       }));
       
       setGenres(genresWithSongCount);
@@ -54,31 +71,55 @@ const GenreManagement = () => {
     }
   };
 
+  useEffect(() => {
+    fetchGenres();
+  }, [searchTerm]);
+
   const handleAddGenre = async () => {
     if (!newGenreName.trim()) {
       setError('Genre name cannot be empty');
       return;
     }
 
-    try {
-      const response = await axios.post('http://localhost:3000/api/genres', {
-        name: newGenreName.trim()
-      }, {
-        withCredentials: true
-      });
+    const isDuplicate = genres.some(
+      genre => genre.name.toLowerCase() === newGenreName.trim().toLowerCase()
+    );
 
-      // Add random song count to new genre
-      const newGenre = {
-        ...response.data,
-        songCount: getRandomSongCount()
-      };
+    if (isDuplicate) {
+      setError('A genre with this name already exists');
+      return;
+    }
+
+    try {
+      console.log('Creating new genre:', newGenreName.trim());
+      const response = await axios.post('http://localhost:8080/api/genres', 
+        JSON.stringify({
+        name: newGenreName.trim()
+        }), 
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Response from server:', response.data);
       
-      setGenres(prev => [...prev, newGenre]);
+      // Fetch lại danh sách genre sau khi thêm mới
+      await fetchGenres();
+      
       setNewGenreName('');
       setShowAddModal(false);
       setError('');
     } catch (error) {
       console.error('Error adding genre:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
       const errorMessage = error.response?.data?.message || 'Failed to add genre';
       // Clean up the Prisma error message to make it more user-friendly
       const cleanErrorMessage = errorMessage.includes('Unique constraint')
@@ -90,29 +131,36 @@ const GenreManagement = () => {
     }
   };
 
-  const handleUpdateGenre = async (genreId, newName) => {
-    if (!newName.trim()) {
+  const handleUpdateGenre = async () => {
+    if (!newGenreName.trim()) {
       setError('Genre name cannot be empty');
       return;
     }
 
+    const isDuplicate = genres.some(
+      genre => 
+        genre.id !== selectedGenre.id && 
+        genre.name.toLowerCase() === newGenreName.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      setError('A genre with this name already exists');
+      return;
+    }
+
     try {
-      const response = await axios.put(`http://localhost:3000/api/genres/${genreId}`, {
-        name: newName.trim()
+      await axios.put(`http://localhost:8080/api/genres/${selectedGenre.id}`, {
+        name: newGenreName.trim()
       }, {
         withCredentials: true
       });
 
-      // Keep the same song count when updating
-      const updatedGenre = {
-        ...response.data,
-        songCount: genres.find(g => g._id === genreId)?.songCount || 0
-      };
-
-      setGenres(prev => prev.map(genre => 
-        genre._id === genreId ? updatedGenre : genre
-      ));
-      setEditingGenre(null);
+      // Fetch lại danh sách genre sau khi cập nhật
+      await fetchGenres();
+      
+      setShowEditModal(false);
+      setSelectedGenre(null);
+      setNewGenreName('');
       setError('');
     } catch (error) {
       console.error('Error updating genre:', error);
@@ -127,12 +175,15 @@ const GenreManagement = () => {
     }
   };
 
-  const handleDeleteGenre = async (genreId) => {
+  const handleDeleteGenre = async () => {
     try {
-      await axios.delete(`http://localhost:3000/api/genres/${genreId}`, {
+      await axios.delete(`http://localhost:8080/api/genres/${selectedGenre.id}`, {
         withCredentials: true
       });
-      setGenres(prev => prev.filter(genre => genre._id !== genreId));
+      
+      // Fetch lại danh sách genre sau khi xóa
+      await fetchGenres();
+      
       setShowDeleteConfirm(false);
       setSelectedGenre(null);
       setError('');
@@ -147,8 +198,14 @@ const GenreManagement = () => {
     }
   };
 
+  const handleEditClick = (genre) => {
+    setSelectedGenre(genre);
+    setNewGenreName(genre.name);
+    setShowEditModal(true);
+  };
+
   const filteredGenres = genres.filter(genre =>
-    genre.name.toLowerCase().includes(searchTerm.toLowerCase())
+    genre && genre.name && genre.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Animation variants
@@ -253,29 +310,14 @@ const GenreManagement = () => {
                 </motion.div>
               ) : (
                 filteredGenres.map((genre) => (
+                  genre && genre.id && genre.name ? (
                   <motion.div
-                    key={genre._id}
+                      key={genre.id}
                     variants={item}
                     layout
                     className="bg-zinc-800/50 backdrop-blur-xl rounded-xl overflow-hidden"
                   >
                     <div className="p-4 flex items-center justify-between">
-                      {editingGenre === genre._id ? (
-                        <input
-                          type="text"
-                          defaultValue={genre.name}
-                          className="flex-1 mr-4 px-3 py-1 bg-zinc-700 rounded border border-zinc-600 focus:border-orange-500 focus:outline-none text-white"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUpdateGenre(genre._id, e.target.value);
-                            }
-                          }}
-                          onBlur={(e) => {
-                            handleUpdateGenre(genre._id, e.target.value);
-                          }}
-                          autoFocus
-                        />
-                      ) : (
                         <div className="flex-1">
                           <div className="flex items-center gap-4">
                             <div className="p-2 bg-orange-500/10 text-orange-500 rounded-lg">
@@ -285,32 +327,21 @@ const GenreManagement = () => {
                               <h3 className="text-white font-semibold">{genre.name}</h3>
                               <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
                                 <IoMusicalNotesOutline size={16} />
-                                <span>{genre.songCount} songs</span>
+                                <span>{genre.songCount || 0} songs</span>
                               </div>
                             </div>
                           </div>
                         </div>
-                      )}
 
                       <div className="flex items-center gap-2">
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => {
-                            if (editingGenre === genre._id) {
-                              setEditingGenre(null);
-                            } else {
-                              setEditingGenre(genre._id);
-                            }
-                          }}
+                            onClick={() => handleEditClick(genre)}
                           className="p-2 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded-lg transition-colors"
-                          title={editingGenre === genre._id ? "Cancel edit" : "Edit genre"}
+                            title="Edit genre"
                         >
-                          {editingGenre === genre._id ? (
-                            <IoCloseOutline size={20} />
-                          ) : (
                             <IoPencilOutline size={20} />
-                          )}
                         </motion.button>
                         <motion.button
                           whileHover={{ scale: 1.1 }}
@@ -327,6 +358,7 @@ const GenreManagement = () => {
                       </div>
                     </div>
                   </motion.div>
+                  ) : null
                 ))
               )}
             </motion.div>
@@ -380,6 +412,54 @@ const GenreManagement = () => {
           )}
         </AnimatePresence>
 
+        {/* Edit Genre Modal */}
+        <AnimatePresence>
+          {showEditModal && selectedGenre && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-zinc-800 rounded-xl p-6 max-w-md w-full mx-4"
+              >
+                <h3 className="text-xl font-semibold text-white mb-4">Edit Genre</h3>
+                <input
+                  type="text"
+                  value={newGenreName}
+                  onChange={(e) => setNewGenreName(e.target.value)}
+                  placeholder="Enter genre name"
+                  className="w-full px-4 py-2 bg-zinc-700 rounded-lg border border-zinc-600 focus:border-orange-500 focus:outline-none text-white mb-4"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setSelectedGenre(null);
+                      setNewGenreName('');
+                      setError('');
+                    }}
+                    className="flex-1 px-4 py-2 bg-zinc-700 text-white rounded-lg hover:bg-zinc-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleUpdateGenre}
+                    className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <IoSaveOutline size={20} />
+                    Save Changes
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Delete Confirmation Modal */}
         <AnimatePresence>
           {showDeleteConfirm && selectedGenre && (
@@ -421,7 +501,7 @@ const GenreManagement = () => {
                     Cancel
                   </button>
                   <button
-                    onClick={() => handleDeleteGenre(selectedGenre._id)}
+                    onClick={() => handleDeleteGenre(selectedGenre.id)}
                     className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                   >
                     Delete Genre

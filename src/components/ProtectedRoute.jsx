@@ -19,5 +19,4 @@ console.log(user)
 
   return <Outlet />
 }
-
 export default ProtectedRoute

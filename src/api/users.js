@@ -2,12 +2,27 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
 const Song = require('../models/song');
-const { isAdmin } = require('../middleware/auth');
+const { isAdmin, isAuthenticated } = require('../middleware/auth');
 
 // Function to count songs for a user
 const countUserSongs = (songs, userId) => {
   return songs.filter(song => song.uploadedBy.toString() === userId.toString()).length;
 };
+
+// Get liked songs for current user
+router.get('/liked', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('likedSongs');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json(user.likedSongs || []);
+  } catch (error) {
+    console.error('Error fetching liked songs:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 // Get all users (admin only)
 router.get('/', isAdmin, async (req, res) => {

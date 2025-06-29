@@ -59,7 +59,7 @@ const Carousel = () => {
         const fetchSongs = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get('http://localhost:3000/api/songs', {
+                const response = await axios.get('http://localhost:8080/api/songs', {
                     withCredentials: true
                 });
                 console.log('Fetched songs:', response.data);

@@ -25,8 +25,8 @@ export default function Statistics() {
   const fetchStatistics = async () => {
     try {
       const [songs, users] = await Promise.all([
-        axios.get('http://localhost:3000/api/songs', { withCredentials: true }),
-        axios.get('http://localhost:3000/api/users', { withCredentials: true })
+        axios.get('http://localhost:8080/api/songs', { withCredentials: true }),
+        axios.get('http://localhost:8080/api/users', { withCredentials: true })
       ]);
 
       // Process songs by date

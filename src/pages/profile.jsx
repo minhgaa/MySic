@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import BaseView from '../components/BaseView';
 import { useAuth } from '../hooks/authContext';
 import { useNavigate } from 'react-router-dom';
@@ -18,12 +18,13 @@ import {
   IoAlertCircleOutline,
   IoLogOutOutline,
   IoPlayOutline,
-  IoPauseOutline
+  IoPauseOutline,
+  IoCheckmarkCircleOutline
 } from 'react-icons/io5';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, logout, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -49,11 +50,11 @@ const Profile = () => {
   // Fetch uploaded songs
   useEffect(() => {
     const fetchUploadedSongs = async () => {
-      if (!authUser?._id) return;
+      if (!authUser?.id) return;
       
       try {
         setLoadingSongs(true);
-        const response = await axiosInstance.get(`/api/songs/user/${authUser._id}`);
+        const response = await axiosInstance.get(`/api/songs/by-user?userId=${authUser.id}`);
         setUploadedSongs(response.data);
       } catch (err) {
         console.error('Error fetching uploaded songs:', err);
@@ -64,10 +65,10 @@ const Profile = () => {
     };
 
     fetchUploadedSongs();
-  }, [authUser?._id]);
+  }, [authUser?.id]);
 
   const handleSave = async () => {
-    if (!authUser?._id) return;
+    if (!authUser?.id) return;
     
     try {
       setLoading(true);
@@ -78,11 +79,15 @@ const Profile = () => {
         email: editedUser.email
       };
 
-      const response = await axiosInstance.put(`/api/users/${authUser._id}`, updates);
-
+      const response = await axiosInstance.put(`/api/users/${authUser.id}`, updates);
+      console.log('Update profile response:', response.data);
+      
+      // Update user data in context
+      await updateUser(authUser.id);
+      
       setEditedUser({
         ...editedUser,
-        ...response.data
+        ...authUser
       });
       
       setIsEditing(false);
@@ -148,7 +153,7 @@ const Profile = () => {
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
-    if (!file || !authUser?._id) return;
+    if (!file || !authUser?.id) return;
 
     try {
       setLoading(true);
@@ -163,19 +168,25 @@ const Profile = () => {
 
       // Upload to Cloudinary
       const imageUrl = await uploadToCloudinary(file);
+      console.log('Avatar uploaded to Cloudinary:', imageUrl);
 
       // Update user profile with new avatar URL
-      const response = await axiosInstance.put(`/api/users/${authUser._id}`, {
+      const response = await axiosInstance.put(`/api/users/${authUser.id}`, {
         avatarUrl: imageUrl
       });
+      console.log('Update avatar response:', response.data);
+
+      // Update user data in context
+      await updateUser(authUser.id);
 
       // Update local state
-      setEditedUser({
-        ...editedUser,
-        ...response.data
-      });
+      setEditedUser(prev => ({
+        ...prev,
+        avatarUrl: imageUrl
+      }));
 
       setUploadProgress(0);
+      setIsEditing(false);
     } catch (err) {
       console.error('Error updating avatar:', err);
       setError(err.response?.data?.message || 'Failed to update avatar. Please try again.');
@@ -339,16 +350,6 @@ const Profile = () => {
                 label="Liked"
                 value={`${authUser?.likedSongs || 0} songs`}
               />
-              <StatCard 
-                icon={IoTimeOutline}
-                label="Listening Time"
-                value={`${Math.floor((authUser?.listeningTime || 0) / 60)}h ${(authUser?.listeningTime || 0) % 60}m`}
-              />
-              <StatCard 
-                icon={IoPersonOutline}
-                label="Following"
-                value={`${authUser?.following || 0} artists`}
-              />
             </div>
           </motion.div>
 
@@ -420,7 +421,7 @@ const Profile = () => {
                   <p>You haven't uploaded any songs yet.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 overflow-y-scroll">
                   {uploadedSongs.map((song) => (
                     <motion.div
                       key={song._id}

@@ -20,7 +20,7 @@ export default function SearchView({ query }) {
     const fetchResults = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`http://localhost:3000/api/search?keywords=${query}`, {
+        const response = await axios.get(`http://localhost:8080/api/search?keywords=${query}`, {
           withCredentials: true
         });
         setSongs(response.data.songs || []);

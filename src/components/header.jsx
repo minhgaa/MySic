@@ -43,45 +43,7 @@ export default function Header({ setIsSearching, setSearchQuery }) {
 
         {/* Right section */}
         <div className="flex items-center gap-4">
-          {user ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate('/profile')}
-                className="hover:opacity-80 transition-opacity"
-              >
-                <img
-                  src={user.avatarUrl || '/default-avatar.png'}
-                  alt="Avatar"
-                  className="w-10 h-10 rounded-full object-cover ring-2 ring-orange-500/50 hover:ring-orange-500 transition-all"
-                />
-              </button>
-              <div>
-                <p className="text-sm font-semibold">{user.name}</p>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs text-black px-2 py-[2px] rounded-full ${
-                    user.role === "premium" ? "bg-emerald-600" : "bg-gray-400"
-                  }`}>
-                    {user.role === "premium" ? "Premium" : "Free"}
-                  </span>
-                  {user.role === "admin" && (
-                    <button
-                      onClick={() => navigate('/admin/songs')}
-                      className="text-xs text-orange-500 hover:text-orange-400"
-                    >
-                      Admin Panel
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => navigate('/login')}
-              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700"
-            >
-              Login / Sign Up
-            </button>
-          )}
+          
 
           {/* Action Icons */}
           <div className="flex items-center gap-3 ml-4">
@@ -94,13 +56,29 @@ export default function Header({ setIsSearching, setSearchQuery }) {
                 <IoCloudUploadOutline size={20} />
               </button>
             )}
-            <button className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center hover:bg-zinc-700">
-              <CiHeart />
-            </button>
-            <button className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center hover:bg-zinc-700">
-              <HiOutlineCog8Tooth />
-            </button>
+
           </div>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/profile')}
+                className="hover:opacity-80 transition-opacity"
+              >
+                <img
+                  src={user.avatarUrl || '/default-avatar.png'}
+                  alt="Avatar"
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-orange-500/50 hover:ring-orange-500 transition-all"
+                />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700"
+            >
+              Login / Sign Up
+            </button>
+          )}
         </div>
       </div>
 
