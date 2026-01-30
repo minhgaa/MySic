@@ -203,40 +203,34 @@ const UploadSong = ({ onClose, onSuccess }) => {
         }
     };
 
-    const uploadToCloudinary = async (file, type) => {
+    const uploadToCloudinary = async (file) => {
         const formData = new FormData();
         formData.append('file', file);
-        const preset = type === 'image' ? 'mysic_images' : 'mysic_songs';
-        formData.append('upload_preset', preset);
-
-        // Use 'auto' resource type to let Cloudinary detect the file type
-        const resourceType = 'auto';
+        formData.append('upload_preset', 'mysic_images');
 
         console.log('Starting upload to Cloudinary:', {
-            type,
             fileName: file.name,
             fileSize: file.size,
-            preset,
-            contentType: file.type,
-            resourceType
+            preset: 'mysic_images',
+            contentType: file.type
         });
 
         try {
             const response = await axios.post(
-                `https://api.cloudinary.com/v1_1/dl2lnn4dc/${resourceType}/upload`,
+                `https://api.cloudinary.com/v1_1/dl2lnn4dc/image/upload`,
                 formData,
                 {
                     headers: {
                         'Content-Type': 'multipart/form-data'
                     },
-                    withCredentials: false, // Add this to prevent CORS issues
+                    withCredentials: false,
                     onUploadProgress: (progressEvent) => {
                         const percentCompleted = Math.round(
                             (progressEvent.loaded * 100) / progressEvent.total
                         );
                         setProgress(prev => ({
                             ...prev,
-                            [type]: percentCompleted
+                            image: percentCompleted
                         }));
                     }
                 }
@@ -249,11 +243,10 @@ const UploadSong = ({ onClose, onSuccess }) => {
                 statusText: err.response?.statusText,
                 data: err.response?.data,
                 message: err.message,
-                type: type,
                 fileName: file.name,
                 fileType: file.type
             });
-            throw new Error(`Failed to upload ${type}: ${err.response?.data?.error?.message || err.message}`);
+            throw new Error(`Failed to upload image: ${err.response?.data?.error?.message || err.message}`);
         }
     };
 
@@ -276,30 +269,41 @@ const UploadSong = ({ onClose, onSuccess }) => {
                 throw new Error('Please fill in all required fields: title, artist, and genre');
             }
 
-            // Upload image and audio to Cloudinary
-            const [imageUrl, audioUrl] = await Promise.all([
-                uploadToCloudinary(image, 'image'),
-                uploadToCloudinary(audio, 'audio')
-            ]);
+            // Upload only image to Cloudinary
+            const imageUrl = await uploadToCloudinary(image);
 
-            // Prepare song data as a regular object
-            const songData = {
+            // Prepare FormData for backend
+            const songFormData = new FormData();
+            songFormData.append('title', formData.title);
+            songFormData.append('artist', formData.artist);
+            songFormData.append('genreId', formData.genreId);
+            songFormData.append('lyrics', formData.lyrics || '');
+            songFormData.append('songImage', imageUrl);
+            songFormData.append('status', 'pending');
+            songFormData.append('audioFile', audio); // Audio file
+
+            console.log('Sending song data to backend:', {
                 title: formData.title,
                 artist: formData.artist,
                 genreId: formData.genreId,
-                lyrics: formData.lyrics || '',
-                fileUrl: audioUrl,
                 songImage: imageUrl,
-                status: 'pending'
-            };
+                audioFileName: audio.name
+            });
 
-            console.log('Sending song data to backend:', songData);
-
-            // Send song data to backend as JSON
-            const response = await axios.post('http://localhost:8080/api/songs', songData, {
+            // Send FormData to backend
+            const response = await axios.post('http://localhost:8080/api/songs', songFormData, {
                 withCredentials: true,
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'multipart/form-data'
+                },
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round(
+                        (progressEvent.loaded * 100) / progressEvent.total
+                    );
+                    setProgress(prev => ({
+                        ...prev,
+                        audio: percentCompleted
+                    }));
                 }
             });
 
@@ -626,4 +630,4 @@ const UploadSong = ({ onClose, onSuccess }) => {
     );
 };
 
-export default UploadSong; 
+export default UploadSong;

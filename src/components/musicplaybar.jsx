@@ -12,25 +12,12 @@ const MusicPlaybar = () => {
     const { currentSong, isPlaying, playSong, pauseSong, audioRef, toggleLike, isLiked } = useMusic();
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [buffered, setBuffered] = useState(0);
     const [volume, setVolume] = useState(1);
     const [songs, setSongs] = useState([]);
     const [isTextOverflow, setIsTextOverflow] = useState(false);
     const [isLikeAnimating, setIsLikeAnimating] = useState(false);
     const [openPlaylistDialog, setOpenPlaylistDialog] = useState(false);
-
-    useEffect(() => {
-        if (currentSong?.fileUrl) {
-            const audio = new Audio(currentSong.fileUrl);
-            audio.addEventListener('loadedmetadata', () => {
-                setDuration(audio.duration);
-            });
-            audio.addEventListener('error', () => {
-                setDuration(0);
-            });
-        } else {
-            setDuration(0);
-        }
-    }, [currentSong]);
 
     useEffect(() => {
         const fetchSongs = async () => {
@@ -62,14 +49,38 @@ const MusicPlaybar = () => {
             handleNextSong();
         };
 
+        const handleDurationChange = () => {
+            // For HLS streams, duration might change
+            if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+                setDuration(audio.duration);
+            }
+        };
+
+        const handleProgress = () => {
+            // Update buffered progress for streaming
+            if (audio.buffered.length > 0) {
+                const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+                setBuffered(bufferedEnd);
+            }
+        };
+
         audio.addEventListener('timeupdate', handleTimeUpdate);
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('durationchange', handleDurationChange);
         audio.addEventListener('ended', handleEnded);
+        audio.addEventListener('progress', handleProgress);
+
+        // Initialize duration if already loaded
+        if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+            setDuration(audio.duration);
+        }
 
         return () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('durationchange', handleDurationChange);
             audio.removeEventListener('ended', handleEnded);
+            audio.removeEventListener('progress', handleProgress);
         };
     }, [audioRef]);
 
@@ -104,8 +115,11 @@ const MusicPlaybar = () => {
         if (!currentSong) return;
         
         const audio = audioRef.current;
-        audio.currentTime = newValue;
-        setProgress(newValue);
+        // Only allow seeking if duration is valid
+        if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+            audio.currentTime = newValue;
+            setProgress(newValue);
+        }
     };
 
     const handleVolumeChange = (_, newValue) => {
@@ -197,23 +211,47 @@ const MusicPlaybar = () => {
                 </Box>
 
                 <Box className="flex flex-col justify-center items-center h-2/3 w-1/3">
-                    <Slider
-                        value={progress}
-                        onChange={handleProgressChange}
-                        min={0}
-                        max={duration || 100}
-                        sx={{
-                            color: "white",
-                            height: 2,
-                            "& .MuiSlider-thumb": {
-                                width: 12,
-                                height: 12,
-                            },
-                        }}
-                    />
+                <Slider
+  value={progress}
+  onChange={handleProgressChange}
+  min={0}
+  max={duration || 100}
+  disabled={!duration}
+  sx={{
+    height: 2,
+    color: "white",
+
+    "& .MuiSlider-rail": {
+      backgroundColor: "rgba(255,255,255,0.2)",
+      opacity: 1,
+    },
+
+    "& .MuiSlider-rail::before": {
+      content: '""',
+      position: "absolute",
+      left: 0,
+      height: "100%",
+      width: `${duration ? (buffered / duration) * 100 : 0}%`,
+      backgroundColor: "rgba(255,255,255,0.4)",
+      zIndex: 0,
+    },
+
+    "& .MuiSlider-track": {
+      backgroundColor: "white",
+      zIndex: 1,
+    },
+
+    "& .MuiSlider-thumb": {
+      width: 12,
+      height: 12,
+    },
+  }}
+/>
                     <div className="flex justify-between w-full">
                         <Typography sx={{ color: "gray", fontSize: "10px" }}>{formatTime(progress)}</Typography>
-                        <Typography sx={{ color: "gray", fontSize: "10px" }}>{formatTime(duration)}</Typography>
+                        <Typography sx={{ color: "gray", fontSize: "10px" }}>
+                            {duration && !isNaN(duration) && duration !== Infinity ? formatTime(duration) : "--:--"}
+                        </Typography>
                     </div>
                 </Box>
 
